@@ -1,4 +1,4 @@
-name: 🕹️ Libretro Core Builds
+name: 🕹️ Libretro Core Builds (Debug)
 
 on:
   push:
