@@ -1,0 +1,462 @@
+name: 🕹️ Libretro Core Builds
+
+on:
+  push:
+    branches:
+      - libretro
+      - libretro-arm64
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build_linux:
+    name: "Linux x86_64"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install Packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang liblz4-dev libwebp-dev \
+            libshaderc-dev libcurl4-openssl-dev libpcap-dev libfontconfig-dev \
+            libudev-dev libx11-dev libxrandr-dev libxext-dev extra-cmake-modules \
+            libwayland-dev libegl-dev libdbus-1-dev libfreetype-dev libjpeg-turbo8-dev \
+            libpng-dev zlib1g-dev libzstd-dev libdrm-dev libxkbcommon-dev libpipewire-0.3-dev \
+            libpulse-dev libasound2-dev \
+            libxcursor-dev libxi-dev libxinerama-dev libxfixes-dev libxrender-dev \
+            libxss-dev libxtst-dev libgl1-mesa-dev libdecor-0-dev libgbm-dev
+
+      - name: Cache Dependencies
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: deps
+          key: linux-libretro-deps ${{ hashFiles('pcee2-libretro/scripts/build-deps-linux.sh') }}
+
+      - name: Build Dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: bash pcee2-libretro/scripts/build-deps-linux.sh "$PWD/deps"
+
+      - name: Generate CMake
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DENABLE_QT_UI=OFF -DENABLE_TESTS=OFF -DENABLE_LIBRETRO=ON \
+            -DCMAKE_PREFIX_PATH="$PWD/deps" \
+            -DSHADERC_STATIC=ON \
+            "-DSHADERC_LIBRARY=$PWD/deps/lib/libshaderc_combined.a" \
+            -DDISABLE_ADVANCE_SIMD=ON
+
+      - name: Build Core
+        run: cmake --build build --target pcee2-libretro
+
+      - name: Prepare Artifact
+        run: |
+          mkdir artifact
+          cp build/bin/pcee2_libretro.so pcee2-libretro/pcee2_libretro.info artifact/
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcee2_libretro-linux-x86_64
+          path: artifact/*
+
+  build_linux_arm64:
+    name: "Linux aarch64"
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install Packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang liblz4-dev libwebp-dev \
+            libshaderc-dev libcurl4-openssl-dev libpcap-dev libfontconfig-dev \
+            libudev-dev libx11-dev libxrandr-dev libxext-dev extra-cmake-modules \
+            libwayland-dev libegl-dev libdbus-1-dev libfreetype-dev libjpeg-turbo8-dev \
+            libpng-dev zlib1g-dev libzstd-dev libdrm-dev libxkbcommon-dev libpipewire-0.3-dev \
+            libpulse-dev libasound2-dev \
+            libxcursor-dev libxi-dev libxinerama-dev libxfixes-dev libxrender-dev \
+            libxss-dev libxtst-dev libgl1-mesa-dev libdecor-0-dev libgbm-dev
+
+      - name: Cache Dependencies
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: deps
+          key: linux-arm64-libretro-deps ${{ hashFiles('pcee2-libretro/scripts/build-deps-linux.sh') }}
+
+      - name: Build Dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: bash pcee2-libretro/scripts/build-deps-linux.sh "$PWD/deps"
+
+      - name: Generate CMake
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DENABLE_QT_UI=OFF -DENABLE_TESTS=OFF -DENABLE_LIBRETRO=ON \
+            -DCMAKE_PREFIX_PATH="$PWD/deps" \
+            -DSHADERC_STATIC=ON \
+            "-DSHADERC_LIBRARY=$PWD/deps/lib/libshaderc_combined.a" \
+            -DDISABLE_ADVANCE_SIMD=ON \
+            -DUSE_OPENGL=ON \
+            -DHOST_PAGE_SIZE:STRING=0x4000 \
+            -DX11_API=ON
+
+      - name: Build Core
+        run: cmake --build build --target pcee2-libretro
+
+      - name: Prepare Artifact
+        run: |
+          mkdir artifact
+          cp build/bin/pcee2_libretro.so pcee2-libretro/pcee2_libretro.info artifact/
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcee2_libretro-linux-aarch64
+          path: artifact/*
+
+  build_linux_arm64_static:
+    name: "Linux aarch64 (static SDL3)"
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install Packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang liblz4-dev libwebp-dev \
+            libshaderc-dev libcurl4-openssl-dev libpcap-dev libfontconfig-dev \
+            libudev-dev libx11-dev libxrandr-dev libxext-dev extra-cmake-modules \
+            libwayland-dev libegl-dev libdbus-1-dev libfreetype-dev libjpeg-turbo8-dev \
+            libpng-dev zlib1g-dev libzstd-dev libdrm-dev libxkbcommon-dev libpipewire-0.3-dev \
+            libpulse-dev libasound2-dev \
+            libxcursor-dev libxi-dev libxinerama-dev libxfixes-dev libxrender-dev \
+            libxss-dev libxtst-dev libgl1-mesa-dev libdecor-0-dev libgbm-dev
+
+      - name: Cache Dependencies
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: deps
+          key: linux-arm64-libretro-static-deps ${{ hashFiles('pcee2-libretro/scripts/build-deps-linux.sh') }}
+
+      - name: Build Dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        env:
+          PCEE2_SDL_STATIC: "1"
+        run: bash pcee2-libretro/scripts/build-deps-linux.sh "$PWD/deps"
+
+      - name: Generate CMake
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DENABLE_QT_UI=OFF -DENABLE_TESTS=OFF -DENABLE_LIBRETRO=ON \
+            -DCMAKE_PREFIX_PATH="$PWD/deps" \
+            -DSHADERC_STATIC=ON \
+            "-DSHADERC_LIBRARY=$PWD/deps/lib/libshaderc_combined.a" \
+            -DDISABLE_ADVANCE_SIMD=ON \
+            -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build Core
+        run: cmake --build build --target pcee2-libretro
+
+      - name: Verify self-contained (no libSDL3 NEEDED)
+        run: |
+          if readelf -d build/bin/pcee2_libretro.so | grep -q 'libSDL3'; then
+            echo "ERROR: core still links libSDL3 dynamically:"
+            readelf -d build/bin/pcee2_libretro.so | grep NEEDED
+            exit 1
+          fi
+          echo "OK: SDL3 is statically linked, core is self-contained."
+
+      - name: Prepare Artifact
+        run: |
+          mkdir artifact
+          cp build/bin/pcee2_libretro.so pcee2-libretro/pcee2_libretro.info artifact/
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcee2_libretro-linux-aarch64-isztl-static
+          path: artifact/*
+
+  build_linux_arm64_bookworm:
+    name: "Linux aarch64 (Debian Bookworm, static SDL3)"
+    runs-on: ubuntu-24.04-arm
+    container: debian:bookworm
+    timeout-minutes: 180
+    steps:
+      # Build inside a Debian Bookworm container so the core links against
+      # glibc 2.36, matching Raspberry Pi OS Bookworm. The ubuntu-24.04-arm
+      # runner used by the other aarch64 jobs links glibc 2.38, which won't
+      # load on a Pi (GLIBC_2.38 not found). clang-16 (Bookworm main) is new
+      # enough for the C++20 codebase.
+      - name: Install Packages
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git python3 build-essential pkg-config \
+            cmake ninja-build clang-16 \
+            liblz4-dev libwebp-dev libcurl4-openssl-dev libpcap-dev libfontconfig-dev \
+            libudev-dev libx11-dev libxrandr-dev libxext-dev extra-cmake-modules \
+            libwayland-dev libegl-dev libdbus-1-dev libfreetype-dev libjpeg-dev \
+            libpng-dev zlib1g-dev libzstd-dev libdrm-dev libxkbcommon-dev libpipewire-0.3-dev \
+            libpulse-dev libasound2-dev \
+            libxcursor-dev libxi-dev libxinerama-dev libxfixes-dev libxrender-dev \
+            libxss-dev libxtst-dev libgl1-mesa-dev libdecor-0-dev libgbm-dev
+
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Cache Dependencies
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: deps
+          key: linux-arm64-bookworm-deps ${{ hashFiles('pcee2-libretro/scripts/build-deps-linux.sh') }}
+
+      - name: Build Dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        env:
+          PCEE2_SDL_STATIC: "1"
+          PCEE2_BUILD_PNG_ZSTD: "1"
+        run: bash pcee2-libretro/scripts/build-deps-linux.sh "$PWD/deps"
+
+      - name: Generate CMake
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang-16 -DCMAKE_CXX_COMPILER=clang++-16 \
+            -DENABLE_QT_UI=OFF -DENABLE_TESTS=OFF -DENABLE_LIBRETRO=ON \
+            -DCMAKE_PREFIX_PATH="$PWD/deps" \
+            -DSHADERC_STATIC=ON \
+            "-DSHADERC_LIBRARY=$PWD/deps/lib/libshaderc_combined.a" \
+            -DDISABLE_ADVANCE_SIMD=ON \
+            -DUSE_OPENGL=ON \
+            -DHOST_PAGE_SIZE:STRING=0x4000 \
+            -DX11_API=ON \
+            -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build Core
+        run: cmake --build build --target pcee2-libretro
+
+      - name: Verify self-contained (no libSDL3 NEEDED)
+        run: |
+          if readelf -d build/bin/pcee2_libretro.so | grep -q 'libSDL3'; then
+            echo "ERROR: core still links libSDL3 dynamically:"
+            readelf -d build/bin/pcee2_libretro.so | grep NEEDED
+            exit 1
+          fi
+          echo "OK: SDL3 is statically linked, core is self-contained."
+
+      - name: Verify glibc <= 2.36 (Bookworm-compatible)
+        run: |
+          maxglibc=$(objdump -T build/bin/pcee2_libretro.so | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sort -V | tail -1)
+          echo "Max required glibc: $maxglibc"
+          # 2.36 is Bookworm's glibc; fail if the core needs anything newer.
+          if [ "$(printf '%s\nGLIBC_2.36\n' "$maxglibc" | sort -V | tail -1)" != "GLIBC_2.36" ]; then
+            echo "ERROR: core requires $maxglibc, newer than Bookworm's GLIBC_2.36"
+            exit 1
+          fi
+          echo "OK: core is Bookworm-glibc-compatible."
+
+      - name: Prepare Artifact
+        run: |
+          mkdir artifact
+          cp build/bin/pcee2_libretro.so pcee2-libretro/pcee2_libretro.info artifact/
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcee2_libretro-linux-aarch64-bookworm-vk
+          path: artifact/*
+
+  build_windows:
+    name: "Windows x64 (MSVC)"
+    runs-on: windows-2025
+    timeout-minutes: 150
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Locate vcvars
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`call vswhere -latest -property installationPath`) do set "VSINSTPATH=%%i"
+          echo VCVARSPATH=%VSINSTPATH%\VC\Auxiliary\Build\vcvars64.bat>>%GITHUB_ENV%
+
+      - name: Cache Dependencies
+        id: cache-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: deps
+          key: windows-libretro-static-deps ${{ hashFiles('pcee2-libretro/scripts/build-deps-windows.bat') }}
+
+      - name: Build Dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        shell: cmd
+        run: |
+          call "%VCVARSPATH%" || exit /b
+          call pcee2-libretro\scripts\build-deps-windows.bat %cd%\deps || exit /b
+
+      - name: Save Dependencies Cache
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: deps
+          key: windows-libretro-static-deps ${{ hashFiles('pcee2-libretro/scripts/build-deps-windows.bat') }}
+
+      - name: Generate CMake
+        shell: cmd
+        run: |
+          call "%VCVARSPATH%" || exit /b
+          cmake . -B build "-DCMAKE_PREFIX_PATH=%cd%\deps" -DCMAKE_BUILD_TYPE=Release -DENABLE_QT_UI=OFF -DENABLE_TESTS=OFF -DENABLE_LIBRETRO=ON -DDISABLE_ADVANCE_SIMD=ON -DSHADERC_STATIC=ON "-DSHADERC_LIBRARY=%cd%\deps\lib\shaderc_combined.lib" -G Ninja
+
+      - name: Build Core
+        shell: cmd
+        run: |
+          call "%VCVARSPATH%" || exit /b
+          cmake --build build --target pcee2-libretro || exit /b
+
+      - name: Prepare Artifact
+        shell: cmd
+        run: |
+          mkdir artifact
+          copy build\bin\pcee2_libretro.dll artifact\ || exit /b
+          copy pcee2-libretro\pcee2_libretro.info artifact\ || exit /b
+          (
+            echo PCEE2 libretro core - Windows installation
+            echo ============================================
+            echo Copy pcee2_libretro.dll and pcee2_libretro.info into your RetroArch "cores" directory.
+            echo Requires the Microsoft Visual C++ 2015-2022 Redistributable x64.
+          ) > artifact\README.txt
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcee2_libretro-windows-x64
+          path: artifact/*
+
+  build_macos:
+    name: "macOS x86_64"
+    runs-on: macos-15
+    continue-on-error: true
+    timeout-minutes: 320
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install Packages
+        run: |
+          if ! brew install ninja nasm; then
+            brew update
+            brew install ninja nasm
+          fi
+
+      - name: Restore Dependencies Cache
+        id: cache-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/deps
+          key: macos-libretro-static-deps ${{ hashFiles('pcee2-libretro/scripts/build-deps-macos.sh') }}
+
+      - name: Build Dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: bash pcee2-libretro/scripts/build-deps-macos.sh "$HOME/deps"
+
+      # save immediately so a later timeout can't lose the deps build
+      - name: Save Dependencies Cache
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/deps
+          key: macos-libretro-static-deps ${{ hashFiles('pcee2-libretro/scripts/build-deps-macos.sh') }}
+
+      - name: Generate CMake
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_PREFIX_PATH="$HOME/deps" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="x86_64" \
+            -DDISABLE_ADVANCE_SIMD=ON \
+            -DENABLE_QT_UI=OFF -DENABLE_TESTS=OFF -DENABLE_LIBRETRO=ON \
+            -DSHADERC_STATIC=ON "-DSHADERC_LIBRARY=$HOME/deps/lib/libshaderc_combined.a"
+
+      - name: Build Core
+        run: cmake --build build --target pcee2-libretro --parallel
+
+      - name: Prepare Artifact
+        run: |
+          mkdir artifact
+          cp build/bin/pcee2_libretro.dylib pcee2-libretro/pcee2_libretro.info artifact/
+          # runtime-dlopen'd Vulkan driver (found next to the core via DynamicLibrary)
+          cp "$HOME"/deps/lib/libMoltenVK.dylib artifact/
+          cd artifact
+
+          # The core must be self-contained apart from the dlopen'd libs above;
+          # fail loudly if any deps-prefix install names leaked in.
+          if otool -L pcee2_libretro.dylib | grep -q "/Users/runner/deps"; then
+            echo "ERROR: core still references deps dylibs:" && otool -L pcee2_libretro.dylib
+            exit 1
+          fi
+
+          for f in *.dylib; do
+            codesign -f -s - "$f"
+          done
+          ls -la
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcee2_libretro-macos-x86_64
+          path: artifact/*
+
+  release:
+    name: "Attach Release Assets"
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && needs.build_linux.result == 'success' && needs.build_windows.result == 'success' }}
+    needs: [build_linux, build_windows, build_macos]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Package
+        run: |
+          cd artifacts
+          for dir in pcee2_libretro-*; do
+            [ -d "$dir" ] && (cd "$dir" && zip -9 "../$dir.zip" *)
+          done
+
+      - name: Attach to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/pcee2_libretro-*.zip
