@@ -256,7 +256,7 @@ jobs:
             -DUSE_OPENGL=ON \
             -DHOST_PAGE_SIZE:STRING=0x4000 \
             -DX11_API=ON \
-            -DCMAKE_BUILD_TYPE=Debug
+            -DCMAKE_BUILD_TYPE=Debug 
 
       - name: Build Core
         run: cmake --build build --target pcee2-libretro
